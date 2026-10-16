@@ -1,0 +1,70 @@
+name: Build Intel macOS installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-intel-macos.yml'
+      - '打包.spec'
+      - '打包安装包.command'
+      - 'requirements.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build x86_64 DMG
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      PYINSTALLER_TARGET_ARCH: x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install build dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -r requirements.txt pyinstaller==6.16.0
+
+      - name: Build Intel installer
+        run: zsh ./打包安装包.command 1.2.0-intel-x86_64
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WeChatChatExport-1.2.0-intel-x86_64
+          path: dist/WeChatChatExport-1.2.0-intel-x86_64.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish installer to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.2.0-intel-build-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          Intel Mac（x86_64）安装包，由 GitHub Actions 在 macOS Intel runner 上构建。
+
+          下载 WeChatChatExport-1.2.0-intel-x86_64.dmg，打开后将 App 拖到 Applications。
+          本包未经过 Apple 开发者签名和公证；首次打开可能需要在「系统设置 → 隐私与安全性」中允许打开。
+          首次使用需授权「辅助功能」和「屏幕录制」，然后退出 App 重新打开。
+
+          此发布只完成打包，未进行真实微信会话或不同 macOS 版本的运行测试。
+          NOTES
+          gh release create "$TAG" dist/WeChatChatExport-1.2.0-intel-x86_64.dmg \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "微信聊天记录导出 1.2.0 · Intel Mac" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"

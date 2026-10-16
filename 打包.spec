@@ -11,6 +11,7 @@
 import os
 import sys
 import importlib.metadata as md
+from importlib.util import find_spec
 
 hidden = [
     # pyobjc：读屏、OCR、窗口枚举、前台化
@@ -70,7 +71,7 @@ a = Analysis(
     binaries=[],
     datas=[('ui/index.html', 'ui'),
            (NOTICES, '.'),
-           ('.venv/lib/python3.9/site-packages/ApplicationServices', 'ApplicationServices')],
+           (os.path.dirname(find_spec('ApplicationServices').origin), 'ApplicationServices')],
     hiddenimports=hidden,
     hookspath=[],
     hooksconfig={},
@@ -89,7 +90,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,          # 图形界面，不要终端窗口
-    target_arch=None,
+    target_arch=os.environ.get('PYINSTALLER_TARGET_ARCH') or None,
     codesign_identity=None,
     entitlements_file=None,
 )
